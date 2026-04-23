@@ -45,6 +45,9 @@
       .border-primary {
         border-color: #5b4efa !important;
       }
+      .glass-card {
+        border: 1px solid rgba(0, 0, 0, 0.05);
+      }
     </style>
   </head>
   <body
@@ -96,6 +99,7 @@
       <div class="d-flex align-items-center gap-2">
         <select
           id="currencySelector"
+          onchange="changeCurrency()"
           class="form-select form-select-sm bg-light border-0 shadow-none fw-medium"
           style="cursor: pointer"
         >
@@ -116,9 +120,9 @@
       class="flex-grow-1 overflow-auto px-3 pt-3 pb-5"
       style="margin-bottom: 80px; scroll-behavior: smooth"
     >
-      <!-- ปุ่มลอยสำหรับโดเนท -->
       <button
         id="floatDonateBtn"
+        onclick="openDonationModal()"
         class="btn btn-light position-fixed rounded-circle shadow-lg d-flex align-items-center justify-content-center animate-bounce-slow"
         style="
           bottom: 90px;
@@ -135,6 +139,38 @@
       <!-- ================= TAB 1: DASHBOARD ================= -->
       <section id="tab-dashboard" class="tab-content d-block animate-slideUp">
         <div
+          class="glass-card bg-white p-3 d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-3 border-start border-4 border-primary rounded-4 shadow-sm mb-4"
+        >
+          <span class="small fw-bold text-secondary d-flex align-items-center"
+            ><span class="me-2 fs-6">📅</span> เลือกช่วงเวลาข้อมูล</span
+          >
+          <div
+            class="d-flex align-items-center gap-2 w-100"
+            style="max-width: 300px"
+          >
+            <input
+              type="date"
+              id="globalStartDate"
+              onchange="updateDashboard()"
+              class="form-control form-control-sm bg-light border-0 shadow-none text-secondary flex-grow-1"
+            />
+            <span class="text-muted fw-bold">-</span>
+            <input
+              type="date"
+              id="globalEndDate"
+              onchange="updateDashboard()"
+              class="form-control form-control-sm bg-light border-0 shadow-none text-secondary flex-grow-1"
+            />
+            <button
+              onclick="clearGlobalDate()"
+              class="btn btn-sm btn-danger bg-opacity-10 text-danger border-0 fw-bold px-3"
+            >
+              ล้าง
+            </button>
+          </div>
+        </div>
+
+        <div
           class="glass-card p-4 text-white rounded-4 shadow-lg position-relative overflow-hidden mb-4"
           style="background: linear-gradient(135deg, #5b4efa, #3b2cc4)"
         >
@@ -144,7 +180,9 @@
           >
             💰
           </div>
-          <p class="small text-white-50 fw-medium mb-1">ยอดคงเหลือรวม</p>
+          <p class="small text-white-50 fw-medium mb-1">
+            ยอดคงเหลือรวม (ตามช่วงเวลา)
+          </p>
           <h2 id="totalBalance" class="display-5 fw-bold mb-4">฿0.00</h2>
           <div
             class="d-flex justify-content-between border-top border-light border-opacity-25 pt-3 mt-2"
@@ -172,20 +210,87 @@
           </div>
         </div>
 
-        <!-- ส่วนของ AI Mic (ตัวอย่างสำหรับ Bootstrap) -->
         <div
-          class="glass-card p-4 rounded-4 text-center shadow-sm mb-4"
+          class="glass-card bg-white p-4 rounded-4 shadow-sm border-start border-4 border-warning mb-4"
+        >
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="fs-6 fw-bold text-dark d-flex align-items-center m-0">
+              <span class="me-2 fs-5">📊</span> สัดส่วนสถิติ
+            </h3>
+            <select
+              id="chartTypeFilter"
+              onchange="updateChartView()"
+              class="form-select form-select-sm w-auto bg-light border-0 shadow-none fw-medium text-secondary"
+            >
+              <option value="expense">รายจ่าย</option>
+              <option value="income">รายรับ</option>
+            </select>
+          </div>
+          <div
+            class="position-relative d-flex justify-content-center align-items-center w-100"
+            style="height: 230px"
+          >
+            <canvas id="expenseChart"></canvas>
+            <p
+              id="noDataMsg"
+              class="position-absolute text-muted fw-medium small d-none m-0"
+            >
+              ไม่มีข้อมูลในช่วงเวลานี้
+            </p>
+          </div>
+        </div>
+
+        <div class="glass-card bg-white p-4 rounded-4 shadow-sm mb-4">
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <h3 class="fs-6 fw-bold text-dark d-flex align-items-center m-0">
+              <span class="me-2 fs-5">🎯</span> เช็คยอดคุมงบ
+            </h3>
+            <button
+              onclick="openSetBudgetModal()"
+              class="btn btn-sm btn-light text-primary fw-bold border border-primary border-opacity-25 px-3 rounded-3"
+            >
+              ตั้งค่า
+            </button>
+          </div>
+          <div id="budgetContainer" class="d-flex flex-column gap-3">
+            <p class="text-center text-muted small py-3 m-0">
+              กำลังโหลดข้อมูล...
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= TAB 2: ADD TRANSACTION (เพิ่มรายการ) ================= -->
+      <section id="tab-add" class="tab-content d-none animate-slideUp">
+        <div
+          class="glass-card p-4 rounded-4 text-center shadow-sm mb-4 position-relative overflow-hidden"
           style="
             background: linear-gradient(to right, #f8f9fa, #e9ecef);
             border: 1px solid #dee2e6;
           "
         >
-          <p class="small text-primary fw-bold mb-3">ระบบ AI บันทึกด้วยเสียง</p>
+          <div
+            class="position-absolute opacity-25 display-1"
+            style="right: -10px; top: -20px; z-index: 0"
+          >
+            🎙️
+          </div>
+          <div
+            id="vipBadge"
+            class="badge bg-warning text-dark position-absolute d-none"
+            style="top: 15px; left: 15px; z-index: 1"
+          >
+            👑 VIP
+          </div>
+
+          <p class="small text-primary fw-bold mb-3 position-relative z-1">
+            ระบบ AI บันทึกด้วยเสียง
+          </p>
           <button
             type="button"
             id="micBtn"
-            class="btn btn-white border border-2 border-primary text-primary rounded-circle shadow-sm d-flex align-items-center justify-content-center mx-auto opacity-50"
-            style="width: 64px; height: 64px"
+            class="btn btn-white border border-2 border-primary text-primary rounded-circle shadow-sm d-flex align-items-center justify-content-center mx-auto opacity-50 position-relative z-1"
+            style="width: 64px; height: 64px; background: white"
           >
             <svg
               class="w-100 h-100 p-2"
@@ -203,41 +308,222 @@
           </button>
           <p
             id="micStatus"
-            class="small text-secondary mt-3 mb-0"
+            class="small text-secondary mt-3 mb-0 position-relative z-1"
             style="height: 20px"
           >
             แตะไมค์แล้วพูด เช่น "กินชาบู 500 บาท"
           </p>
-          <div
-            id="vipBadge"
-            class="badge bg-warning text-dark position-absolute d-none"
-            style="top: 10px; left: 10px"
-          >
-            👑 VIP
+        </div>
+
+        <div
+          class="glass-card bg-white p-4 rounded-4 shadow-sm border-top border-4 border-primary"
+        >
+          <form id="txForm" onsubmit="handleFormSubmit(event)">
+            <div class="d-flex gap-2 mb-4">
+              <input
+                type="radio"
+                class="btn-check"
+                name="type"
+                id="radioIncome"
+                autocomplete="off"
+                value="income"
+                onchange="updateCategories()"
+              />
+              <label
+                class="btn btn-outline-success flex-grow-1 fw-bold rounded-3 py-2"
+                for="radioIncome"
+                >📥 รายรับ</label
+              >
+
+              <input
+                type="radio"
+                class="btn-check"
+                name="type"
+                id="radioExpense"
+                autocomplete="off"
+                value="expense"
+                onchange="updateCategories()"
+                checked
+              />
+              <label
+                class="btn btn-outline-danger flex-grow-1 fw-bold rounded-3 py-2"
+                for="radioExpense"
+                >📤 รายจ่าย</label
+              >
+            </div>
+
+            <div class="mb-4">
+              <label
+                class="form-label small fw-bold text-secondary text-uppercase"
+                >จำนวนเงิน (บาท)</label
+              >
+              <input
+                type="number"
+                id="amountInput"
+                min="0"
+                step="0.01"
+                class="form-control form-control-lg text-center fs-2 fw-bold text-primary bg-light border-0 shadow-none"
+                placeholder="0.00"
+                required
+              />
+            </div>
+
+            <div class="mb-4">
+              <div
+                class="d-flex justify-content-between align-items-center mb-2"
+              >
+                <label
+                  class="form-label small fw-bold text-secondary text-uppercase mb-0"
+                  >หมวดหมู่</label
+                >
+                <button
+                  type="button"
+                  onclick="openManageCategoriesModal()"
+                  class="btn btn-sm btn-light text-primary fw-bold px-2 py-0"
+                >
+                  ⚙️ จัดการ
+                </button>
+              </div>
+              <select
+                id="categoryInput"
+                onchange="handleCategoryChange()"
+                class="form-select form-select-lg bg-light border-0 shadow-none fs-6 text-dark"
+                required
+              ></select>
+
+              <div id="newCategoryContainer" class="d-none mt-2 d-flex gap-2">
+                <input
+                  type="text"
+                  id="newCategoryTextInput"
+                  class="form-control form-control-sm bg-light border-0 shadow-none"
+                  placeholder="ชื่อหมวดหมู่ใหม่..."
+                />
+                <button
+                  type="button"
+                  onclick="addNewCategory()"
+                  class="btn btn-sm btn-primary fw-bold text-white"
+                >
+                  เพิ่ม
+                </button>
+              </div>
+            </div>
+
+            <div class="row g-3 mb-4">
+              <div class="col-6">
+                <label
+                  class="form-label small fw-bold text-secondary text-uppercase"
+                  >วันที่</label
+                >
+                <input
+                  type="date"
+                  id="dateInput"
+                  class="form-control bg-light border-0 shadow-none text-secondary"
+                  required
+                />
+              </div>
+              <div class="col-6">
+                <label
+                  class="form-label small fw-bold text-secondary text-uppercase"
+                  >รายละเอียด</label
+                >
+                <input
+                  type="text"
+                  id="noteInput"
+                  class="form-control bg-light border-0 shadow-none"
+                  placeholder="ซื้ออะไรมา..."
+                />
+              </div>
+            </div>
+
+            <div class="mb-4">
+              <label
+                class="form-label small fw-bold text-secondary text-uppercase"
+                >แนบรูปสลิป (ถ้ามี)</label
+              >
+              <input
+                type="file"
+                id="imageInput"
+                accept="image/*"
+                class="form-control bg-light border-0 shadow-none text-secondary"
+              />
+              <div
+                id="imagePreviewContainer"
+                class="d-none mt-3 position-relative d-inline-block"
+              >
+                <img
+                  id="imagePreview"
+                  class="rounded-3 border shadow-sm"
+                  style="height: 100px; width: auto; object-fit: cover"
+                />
+                <button
+                  type="button"
+                  onclick="removeImage()"
+                  class="btn btn-danger btn-sm position-absolute top-0 start-100 translate-middle rounded-circle p-0 fw-bold"
+                  style="width: 24px; height: 24px; line-height: 1"
+                >
+                  X
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              id="submitBtn"
+              class="btn btn-primary text-white w-100 py-3 fw-bold fs-5 shadow rounded-4"
+            >
+              บันทึกข้อมูล
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <!-- ================= TAB 3: HISTORY ================= -->
+      <section id="tab-history" class="tab-content d-none animate-slideUp">
+        <div
+          class="glass-card bg-white p-4 rounded-4 shadow-sm border-start border-4 border-warning mb-4"
+        >
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="fs-6 fw-bold text-dark d-flex align-items-center m-0">
+              <span class="me-2 fs-5">📅</span> บิลประจำเดือนนี้
+            </h3>
+            <button
+              onclick="openSubscriptionModal()"
+              class="btn btn-sm btn-warning bg-opacity-10 text-dark fw-bold border border-warning px-3 rounded-3"
+            >
+              + เพิ่มบิล
+            </button>
+          </div>
+          <div id="subscriptionList" class="d-flex flex-column gap-2">
+            <div class="text-center py-4 text-secondary small">
+              กำลังโหลดข้อมูล...
+            </div>
           </div>
         </div>
-      </section>
 
-      <!-- ================= TAB 2 & 3 จะมีโครงสร้างคล้ายๆ กัน (รออัปเดต) ================= -->
-      <section id="tab-add" class="tab-content d-none animate-slideUp">
-        <div class="text-center mt-5 text-secondary">
-          หน้าเพิ่มรายการ (รอกำหนด)
+        <div class="glass-card bg-white p-4 rounded-4 shadow-sm">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h3 class="fs-6 fw-bold text-dark d-flex align-items-center m-0">
+              <span class="me-2 fs-5">🕒</span> ประวัติล่าสุด
+            </h3>
+          </div>
+          <ul id="historyList" class="list-group list-group-flush mb-0">
+            <li
+              class="list-group-item text-center py-4 text-secondary small border-0 px-0"
+            >
+              กำลังโหลดข้อมูล...
+            </li>
+          </ul>
         </div>
-      </section>
-
-      <section id="tab-history" class="tab-content d-none animate-slideUp">
-        <div class="text-center mt-5 text-secondary">หน้าประวัติ (รอกำหนด)</div>
       </section>
     </main>
 
-    <!-- Bottom Navigation Bar (Bootstrap) -->
+    <!-- Bottom Navigation Bar -->
     <nav
-      class="bg-white border-top shadow-sm px-4 py-2 d-flex justify-content-between align-items-center position-fixed bottom-0 w-100"
+      class="bg-white border-top shadow-sm px-4 py-2 d-flex justify-content-between align-items-center position-fixed bottom-0 w-100 pb-safe"
       style="z-index: 1050"
     >
       <button
-        id="nav-dashboard"
-        class="nav-btn btn btn-link text-decoration-none d-flex flex-column align-items-center text-primary p-2"
+        class="nav-btn btn btn-link text-decoration-none d-flex flex-column align-items-center text-primary p-2 active"
         data-target="tab-dashboard"
         style="width: 60px"
       >
@@ -279,7 +565,6 @@
       </button>
 
       <button
-        id="nav-history"
         class="nav-btn btn btn-link text-decoration-none d-flex flex-column align-items-center text-secondary p-2"
         data-target="tab-history"
         style="width: 60px"
@@ -301,7 +586,9 @@
       </button>
     </nav>
 
-    <!-- [NEW] Modal: Paywall ขาย VIP (ปรับเป็นโครงสร้าง Bootstrap 5) -->
+    <!-- ================= MODALS ================= -->
+
+    <!-- Modal: Paywall -->
     <div
       id="vipPaywallModal"
       class="position-fixed top-0 start-0 w-100 h-100 d-none d-flex justify-content-center align-items-center p-3"
@@ -323,15 +610,13 @@
             border-bottom-right-radius: 50%;
           "
         ></div>
-
         <button
           id="closePaywallBtn"
-          class="btn btn-sm btn-light position-absolute top-0 end-0 m-3 rounded-circle fw-bold"
+          class="btn btn-sm btn-light position-absolute top-0 end-0 m-3 rounded-circle fw-bold shadow-sm"
           style="width: 32px; height: 32px; z-index: 10"
         >
           X
         </button>
-
         <div
           class="display-2 mb-2 mt-3 position-relative z-1"
           style="text-shadow: 0 4px 6px rgba(0, 0, 0, 0.1)"
@@ -343,22 +628,308 @@
         >
           Premium Feature
         </div>
-
         <h3 class="fs-4 fw-bold mb-3 text-dark position-relative z-1">
           ฟีเจอร์ AI บันทึกด้วยเสียง
         </h3>
         <p class="small text-secondary mb-4 position-relative z-1">
           อัปเกรดเป็น <b class="text-warning">สมาชิกระดับ VIP</b> เพื่อปลดล็อก
-          AI ช่วยจดบัญชีอัตโนมัติ!<br />
-          ในราคาเพียง <b class="fs-6 text-dark">49.- / เดือน</b>
+          AI ช่วยจดบัญชีอัตโนมัติ!<br />ในราคาเพียง
+          <b class="fs-6 text-dark">49.- / เดือน</b>
         </p>
-
         <button
           id="upgradeVipBtn"
-          class="btn btn-warning w-100 fw-bold py-3 rounded-3 fs-5 shadow position-relative z-1"
+          class="btn btn-warning w-100 fw-bold py-3 rounded-3 fs-5 shadow position-relative z-1 text-white"
         >
           อัปเกรดเป็น VIP ทันที 🚀
         </button>
+      </div>
+    </div>
+
+    <!-- Modal: จัดการหมวดหมู่ -->
+    <div
+      id="manageCategoriesModal"
+      class="position-fixed top-0 start-0 w-100 h-100 d-none d-flex justify-content-center align-items-center p-3"
+      style="
+        background: rgba(33, 37, 41, 0.6);
+        backdrop-filter: blur(4px);
+        z-index: 1060;
+      "
+    >
+      <div
+        class="bg-white rounded-4 w-100 p-4 shadow-lg animate-slideUp"
+        style="max-width: 400px"
+      >
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h3 class="fs-5 fw-bold m-0" id="manageModalTitle">จัดการหมวดหมู่</h3>
+          <button
+            type="button"
+            onclick="closeManageCategoriesModal()"
+            class="btn btn-sm btn-light rounded-circle fw-bold"
+          >
+            X
+          </button>
+        </div>
+        <ul
+          id="manageCategoryList"
+          class="list-group mb-4"
+          style="max-height: 40vh; overflow-y: auto"
+        ></ul>
+        <button
+          type="button"
+          onclick="closeManageCategoriesModal()"
+          class="btn btn-light w-100 fw-bold py-2 rounded-3 text-dark"
+        >
+          เสร็จสิ้น
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal: ตั้งงบประมาณ -->
+    <div
+      id="setBudgetModal"
+      class="position-fixed top-0 start-0 w-100 h-100 d-none d-flex justify-content-center align-items-center p-3"
+      style="
+        background: rgba(33, 37, 41, 0.6);
+        backdrop-filter: blur(4px);
+        z-index: 1060;
+      "
+    >
+      <div
+        class="bg-white rounded-4 w-100 p-4 shadow-lg animate-slideUp"
+        style="max-width: 400px"
+      >
+        <h3 class="fs-5 fw-bold mb-4">🎯 ตั้งค่างบประมาณ</h3>
+        <div class="mb-3">
+          <label class="form-label small fw-bold text-secondary"
+            >หมวดหมู่</label
+          >
+          <select
+            id="budgetCategorySelect"
+            class="form-select bg-light border-0 shadow-none"
+          ></select>
+        </div>
+        <div class="mb-4">
+          <label class="form-label small fw-bold text-secondary"
+            >งบที่ตั้งไว้ (บาท)</label
+          >
+          <input
+            type="number"
+            id="budgetAmountInput"
+            class="form-control form-control-lg bg-light border-0 shadow-none fw-bold"
+            placeholder="0"
+          />
+        </div>
+        <div class="d-flex gap-2">
+          <button
+            onclick="closeSetBudgetModal()"
+            class="btn btn-light flex-grow-1 fw-bold py-2 text-dark"
+          >
+            ยกเลิก
+          </button>
+          <button
+            onclick="saveNewBudget()"
+            class="btn btn-primary text-white flex-grow-1 fw-bold py-2"
+          >
+            บันทึกงบ
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: เพิ่มบิลประจำ -->
+    <div
+      id="subscriptionModal"
+      class="position-fixed top-0 start-0 w-100 h-100 d-none d-flex justify-content-center align-items-center p-3"
+      style="
+        background: rgba(33, 37, 41, 0.6);
+        backdrop-filter: blur(4px);
+        z-index: 1060;
+      "
+    >
+      <div
+        class="bg-white rounded-4 w-100 p-4 shadow-lg animate-slideUp"
+        style="max-width: 400px; max-height: 90vh; overflow-y: auto"
+      >
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h3 class="fs-5 fw-bold m-0">📅 เพิ่มบิลประจำ</h3>
+          <button
+            type="button"
+            onclick="closeSubscriptionModal()"
+            class="btn btn-sm btn-light rounded-circle fw-bold"
+          >
+            X
+          </button>
+        </div>
+        <form onsubmit="saveNewSubscription(event)" id="subForm">
+          <div class="mb-3">
+            <input
+              type="text"
+              id="subName"
+              class="form-control bg-light border-0 shadow-none"
+              placeholder="ชื่อบิล"
+              required
+            />
+          </div>
+          <div class="mb-3">
+            <select
+              id="subCategory"
+              class="form-select bg-light border-0 shadow-none"
+              required
+            ></select>
+          </div>
+          <div class="row g-2 mb-4">
+            <div class="col-6">
+              <input
+                type="number"
+                id="subAmount"
+                min="0"
+                step="0.01"
+                class="form-control bg-light border-0 shadow-none fw-bold"
+                placeholder="จำนวนเงิน"
+                required
+              />
+            </div>
+            <div class="col-6">
+              <input
+                type="number"
+                id="subDay"
+                min="1"
+                max="31"
+                class="form-control bg-light border-0 shadow-none fw-bold"
+                placeholder="วันที่ดิว (1-31)"
+                required
+              />
+            </div>
+          </div>
+          <button
+            type="submit"
+            class="btn btn-warning w-100 fw-bold py-2 text-dark rounded-3"
+          >
+            บันทึกบิลประจำ
+          </button>
+        </form>
+        <div class="mt-4 pt-3 border-top">
+          <ul id="manageSubList" class="list-group list-group-flush gap-2"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: แก้ไขรายการ -->
+    <div
+      id="editTransactionModal"
+      class="position-fixed top-0 start-0 w-100 h-100 d-none d-flex justify-content-center align-items-center p-3"
+      style="
+        background: rgba(33, 37, 41, 0.6);
+        backdrop-filter: blur(4px);
+        z-index: 1060;
+      "
+    >
+      <div
+        class="bg-white rounded-4 w-100 p-4 shadow-lg animate-slideUp"
+        style="max-width: 400px"
+      >
+        <div class="d-flex justify-content-between align-items-center mb-4">
+          <h3 class="fs-5 fw-bold m-0">✏️ แก้ไขรายการ</h3>
+          <button
+            type="button"
+            onclick="closeEditModal()"
+            class="btn btn-sm btn-light rounded-circle fw-bold"
+          >
+            X
+          </button>
+        </div>
+        <form id="editTxForm" onsubmit="submitEditTransaction(event)">
+          <input type="hidden" id="editTxId" />
+          <div class="d-flex gap-2 mb-3">
+            <input
+              type="radio"
+              class="btn-check"
+              name="editType"
+              id="editTypeIncome"
+              value="income"
+              onchange="updateEditCategories()"
+            />
+            <label
+              class="btn btn-outline-success flex-grow-1 fw-bold rounded-3 py-1"
+              for="editTypeIncome"
+              >รายรับ</label
+            >
+
+            <input
+              type="radio"
+              class="btn-check"
+              name="editType"
+              id="editTypeExpense"
+              value="expense"
+              onchange="updateEditCategories()"
+            />
+            <label
+              class="btn btn-outline-danger flex-grow-1 fw-bold rounded-3 py-1"
+              for="editTypeExpense"
+              >รายจ่าย</label
+            >
+          </div>
+          <input
+            type="number"
+            id="editAmount"
+            min="0"
+            step="0.01"
+            class="form-control bg-light border-0 shadow-none fw-bold mb-3"
+            required
+          />
+          <select
+            id="editCategory"
+            class="form-select bg-light border-0 shadow-none mb-3"
+            required
+          ></select>
+          <div class="row g-2 mb-4">
+            <div class="col-6">
+              <input
+                type="date"
+                id="editDate"
+                class="form-control bg-light border-0 shadow-none text-secondary"
+                required
+              />
+            </div>
+            <div class="col-6">
+              <input
+                type="text"
+                id="editNote"
+                class="form-control bg-light border-0 shadow-none"
+                placeholder="รายละเอียด"
+              />
+            </div>
+          </div>
+          <button
+            type="submit"
+            class="btn btn-primary text-white w-100 fw-bold py-2 rounded-3"
+          >
+            บันทึกการแก้ไข
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: ดูรูปภาพสลิป -->
+    <div
+      id="imageViewerModal"
+      class="position-fixed top-0 start-0 w-100 h-100 d-none d-flex justify-content-center align-items-center p-3"
+      style="background: rgba(0, 0, 0, 0.9); z-index: 1070"
+    >
+      <div class="position-relative w-100 text-center" style="max-width: 500px">
+        <button
+          type="button"
+          onclick="closeImageViewer()"
+          class="btn btn-light position-absolute rounded-circle fw-bold"
+          style="top: -40px; right: 0; width: 36px; height: 36px"
+        >
+          X
+        </button>
+        <img
+          id="viewerImage"
+          class="img-fluid rounded-3 shadow-lg"
+          style="max-height: 80vh; object-fit: contain"
+        />
       </div>
     </div>
 
